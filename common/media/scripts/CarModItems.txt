@@ -1,0 +1,41 @@
+module OffTheGrid {
+    imports {
+        Base
+    }
+
+    item WoodGasifier {
+        DisplayCategory = VehicleMaintenance,
+        ItemType = base:container,
+        Weight = 10.0,
+		Capacity = 20,
+        Icon = WoodGasifier,
+        WorldStaticModel = WoodGasifier,
+        CloseSound = CloseMetalToolbox,
+        OpenSound = OpenMetalToolbox,
+        PutInSound = StoreItemMetalToolbox,
+    }
+	
+	item Ash {
+        DisplayCategory = Junk,
+        ItemType = base:normal,
+        Weight = 0.5,
+		Tags = base:iscompostable,
+        Icon = Ash,
+        WorldStaticModel = Ash,
+    }
+	
+	item BucketOfLyeWater {
+        DisplayCategory = WaterContainer,
+        ItemType = base:normal,
+        Weight = 5.0,
+        Icon = bucketOfLyeWater,
+        WorldStaticModel = Bucket_Ground,
+    }
+	item carvedBucketOfLyeWater {
+        DisplayCategory = WaterContainer,
+        ItemType = base:normal,
+        Weight = 5.0,
+        Icon = carvedBucketOfLyeWater,
+        WorldStaticModel = BucketCarved,
+    }
+}

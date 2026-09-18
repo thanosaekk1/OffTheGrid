@@ -1,0 +1,18 @@
+module OffTheGrid {
+    imports {
+        Base
+    }
+	
+	model WoodGasifier
+    {
+        mesh = WorldItems/Wood_Gasifier,
+        texture = WorldItems/Wood_Gasifier,
+    }
+	
+	model Ash
+    {
+        mesh = WorldItems/Ash,
+        texture = WorldItems/Ash,
+        scale = 0.6,
+    }
+}

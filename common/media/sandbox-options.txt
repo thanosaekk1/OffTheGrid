@@ -1,0 +1,26 @@
+VERSION = 1,
+
+option OffTheGrid.GasifierFuelEfficiency {
+    type = double,
+    default = 1.0,
+    min = 0.0,
+    max = 100.0,
+    page = OffTheGrid,
+    translation = OffTheGrid_GasifierFuelEfficiency,
+}
+option OffTheGrid.GasolineExpirationDateStart {
+    type = integer,
+    default = 150,
+    min = 0,
+    max = 1000000,
+    page = OffTheGrid,
+    translation = OffTheGrid_GasolineExpirationDateStart,
+}
+option OffTheGrid.GasolineExpirationDateEnd {
+    type = integer,
+    default = 200,
+    min = 0,
+    max = 1000000,
+    page = OffTheGrid,
+    translation = OffTheGrid_GasolineExpirationDateEnd,
+}

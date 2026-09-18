@@ -1,0 +1,30 @@
+module OffTheGrid {
+    imports {
+        Base
+    }
+    fluid Expired_Petrol
+    {
+        ColorReference = Yellow,
+        DisplayName = Fluid_Name_Expired_Petrol,
+        Categories
+        {
+            Fuel,
+            Hazardous,
+            Industrial,
+        }
+        Poison
+        {
+            maxEffect = Deadly,
+            minAmount = 1.0,
+            diluteRatio = 0.0,
+        }
+        BlendWhiteList
+        {
+            whitelist = true,
+            categories
+            {
+                Fuel,
+            }
+        }
+    }
+}

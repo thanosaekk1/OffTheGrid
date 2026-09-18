@@ -1,0 +1,98 @@
+module OffTheGrid {
+    imports {
+        Base
+    }
+
+    craftRecipe craftWoodGasifier {
+        timedAction = Making,
+        time = 200,
+        Tags = AnySurfaceCraft,
+        category = Assembly,
+
+        inputs {
+            item 1 [Base.Mov_RecycleBin;Base.Mov_GreenGarbageBin;Base.Mov_PublicGarbageBin],
+            item 1 [Base.Funnel],
+            item 1 [Base.SmallSheetMetal],
+            item 2 [Base.MetalPipe],
+            item 4 [Base.Screws],
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 tags[base:saw] mode:keep flags[NoBrokenItems],
+        }
+
+        outputs {
+            item 1 OffTheGrid.WoodGasifier,
+        }
+    }
+
+    craftRecipe MakeLyeWater
+    {
+        timedAction = MixingBucket,
+        time = 70,
+        Tags = InHandCraft,
+        category = Cooking,
+        inputs
+        {
+            item 1 [Base.Bucket;Base.BucketEmpty;Base.BucketWaterDebug;Base.BucketCarved] mode:destroy mappers[bucketType],
+            -fluid 5.0 categories[Water] mode:mixture,
+            item 5 [OffTheGrid.Ash],
+        }
+        outputs
+        {
+            item 1 mapper:bucketType,
+        }
+        itemMapper bucketType
+        {
+            OffTheGrid.BucketOfLyeWater = Base.Bucket;Base.BucketEmpty;Base.BucketWaterDebug,
+            OffTheGrid.carvedBucketOfLyeWater = Base.BucketCarved,
+        }
+    }
+
+    craftRecipe MakeSoapFromLyeWater
+    {
+        timedAction = MixingBucket,
+        time = 150,
+        Tags = InHandCraft,
+        category = Cooking,
+        inputs
+        {
+            item 1 [OffTheGrid.BucketOfLyeWater;OffTheGrid.carvedBucketOfLyeWater] mode:destroy mappers[bucketType],
+            item 1 tags[base:bakingfat],
+            item 1 [Base.Salt],
+            item 1 tags[base:mixingutensil],
+        }
+        outputs
+        {
+            item 5 Base.Soap2,
+            item 1 mapper:bucketType,
+        }
+        itemMapper bucketType
+        {
+            Base.BucketEmpty = OffTheGrid.BucketOfLyeWater,
+            Base.BucketCarved = OffTheGrid.carvedBucketOfLyeWater,
+        }
+    }
+
+    craftRecipe MakeBucketOfCementFromAsh
+    {
+        timedAction = MixingBucket,
+        time = 150,
+        Tags = InHandCraft,
+        category = Masonry,
+        inputs
+        {
+            item 1 [Base.Bucket;Base.BucketEmpty;Base.BucketWaterDebug;Base.BucketCarved] mode:destroy mappers[bucketList],
+            -fluid 10.0 categories[Water] mode:mixture,
+            item 4 [OffTheGrid.Ash],
+            item 2 [Base.Clay],
+        }
+        outputs
+        {
+            item 1 mapper:bucketList,
+        }
+        itemMapper bucketList
+        {
+            Base.BucketCarvedClayCement = Base.BucketCarved,
+            default = Base.BucketClayCement,
+        }
+    }
+}
