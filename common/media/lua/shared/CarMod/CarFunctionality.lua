@@ -54,7 +54,7 @@ local function CarRunWood(car)
             local ash_to_add = instanceItem("OffTheGrid.Ash")
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
-            car:playSound("Fire")
+            car:playSound("CampfireLight")
             --car:setEngineFeature(car:getEngineQuality(), 40, car:getEnginePower())
             car:getModData().runningOnWood = true
             car:getModData().fuelFromWood = gas_tank:getContainerContentAmount()
@@ -85,24 +85,32 @@ local function CarFuelCheck(player)
             -- external refill happened
             carData.runningOnWood = false
         end
-
+        
+        local engineQual = car:getEngineQuality()
+        local engineLoud = carData.ratedLoudness
+        local enginePower = car:getEnginePower()
         --set performance
         if carData.runningOnWood then
             car:setMaxSpeed(carData.ratedSpeed/2)
             carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
-            --car:setEngineFeature(car:getEngineQuality(), round(carData.ratedLoudness/2), car:getEnginePower())
+            --local newLoudness = tonumber(engineLoud)
+            --if not newLoudness then
+            --    print("Number conversion failed")
+            --    return
+            --end
+            --car:setEngineFeature(engineQual, math.floor(newLoudness/2), enginePower)
             --does nothing as loudness is 0
             --print("Speed: ", car:getMaxSpeed(), "Fuel: ", carData.fuelFromWood, "Loudness: ", car:getEngineLoudness())
         else
             car:setMaxSpeed(carData.ratedSpeed)
-            --car:setEngineFeature(car:getEngineQuality(), carData.ratedLoudness, car:getEnginePower())
+            --car:setEngineFeature(engineQual, engineLoud, enginePower)
             --print("Speed: ", car:getMaxSpeed(), "Fuel: ", carData.fuelFromWood, "Loudness: ", car:getEngineLoudness())
         end
     end
 end
 
 local function GeneratorRunWood(gasifier_pos, generator)
-    local gasifier_square = getSquare(gasifier_pos:x(), gasifier_pos:y(), gasifier_pos:z())
+    local gasifier_square = getSquare(gasifier_pos.x, gasifier_pos.y, gasifier_pos.z)
     local obj_list = gasifier_square:getLuaTileObjectList()
     local gasifier
     for i=1, #obj_list do
@@ -141,7 +149,10 @@ local function GeneratorRunWood(gasifier_pos, generator)
             local ash_to_add = instanceItem("OffTheGrid.Ash")
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
-            gasifier_square:playSoundLocal("Fire")
+            gasifier_square:playSoundLocal("FireplaceAddFuel")
+            local genCondition = generator:getCondition()
+            print(genCondition)
+            generator:setCondition(genCondition - 2) -- burning wood causes condition to deteriorate faster
             generator:getModData().fuelFromWood = generator:getFuelPercentage()
             break
         end
@@ -152,9 +163,11 @@ local function GeneratorFuelCheck()
     for i=1, #world_wood_gasifiers do
         local gasifier_pos = world_wood_gasifiers[i]
         if gasifier_pos then
-            for pos_x = gasifier_pos:x()-3, gasifier_pos:x()+3 do
-                for pos_y = gasifier_pos:y()-3, gasifier_pos:y()+3 do
-                    local obj_list = getSquare(pos_x,pos_y, gasifier_pos:z()):getLuaTileObjectList()
+            for pos_x = gasifier_pos.x-3, gasifier_pos.x+3 do
+                for pos_y = gasifier_pos.y-3, gasifier_pos.y+3 do
+                    local target_square = getSquare(pos_x,pos_y, gasifier_pos.z)
+                    if not target_square then return end
+                    local obj_list = target_square:getLuaTileObjectList() --causes error
                     if not obj_list then return end
                     for j=1, #obj_list do
                         if obj_list[j]:getObjectName() == "IsoGenerator" then
@@ -164,7 +177,8 @@ local function GeneratorFuelCheck()
                                 if not generatorData.fuelFromWood then
                                     generatorData.fuelFromWood = 0.0
                                 end
-                                if generator:isActivated() and generator:getFuelPercentage()<0.01 then
+                                if generator:isConnected() and generator:getFuelPercentage()<0.01 then
+                                    -- will burn wood without being turned on
                                     GeneratorRunWood(gasifier_pos, generator)
                                 end
                                 if generator:getFuelPercentage() > generatorData.fuelFromWood then
@@ -220,19 +234,32 @@ local old_place_item = ISDropWorldItemAction.complete
 function ISDropWorldItemAction:complete() --inject when placing item to add the Gasifier to the world gasifier list
     old_place_item(self)
     if self.item:getFullType() == "OffTheGrid.WoodGasifier" then
-        local gasifier_pos = Vector3f.new(self.item:getWorldItem():getWorldPosX(), self.item:getWorldItem():getWorldPosY(), self.item:getWorldItem():getWorldPosZ())
-        if not arrayContains(world_wood_gasifiers, gasifier_pos) then
+        local gasifier_pos = {
+            x = self.item:getWorldItem():getWorldPosX(),
+            y = self.item:getWorldItem():getWorldPosY(),
+            z = self.item:getWorldItem():getWorldPosZ()
+        }
+        --local gasifier_pos = Vector3f.new(self.item:getWorldItem():getWorldPosX(), self.item:getWorldItem():getWorldPosY(), self.item:getWorldItem():getWorldPosZ())
+        if not gasifierExists(gasifier_pos) then
             table.insert(world_wood_gasifiers, gasifier_pos)
-            
             --save the gasifier position to mod data
-            --local data = ModData.getOrCreate("OffTheGridData")
-            if OTGData then
-                OTGData.gasifier_list = world_wood_gasifiers
-                print("Gasifiers: ", #OTGData.gasifier_list)
-                ModData.transmit("OffTheGridData")
-            end
+            local OTGData = ModData.getOrCreate("OffTheGridData")
+            OTGData.gasifier_list = world_wood_gasifiers
+            print("Gasifiers: ", #OTGData.gasifier_list)
+            ModData.transmit("OffTheGridData")
         end
     end
+end
+
+function gasifierExists (pos)
+    for _, existing in ipairs(world_wood_gasifiers) do
+        if existing.x == pos.x
+        and existing.y == pos.y
+        and existing.z == pos.z then
+            return true 
+        end
+    end
+    return false
 end
 
 function arrayContains(arr, key)
@@ -242,6 +269,11 @@ function arrayContains(arr, key)
     end
     return found
 end
+
+---------------
+-- COMPOSTER --
+---------------
+
 
 -------------------------
 -- GASOLINE EXPIRATION --
@@ -255,9 +287,7 @@ currentDay = 0
 
 local function initUtils(newGame)
     OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.gasifier_list then
-        world_wood_gasifiers = OTGData.gasifier_list
-    end
+    world_wood_gasifiers = OTGData.gasifier_list or {}
     if newGame then
         fuelExpirationRoll = ZombRandFloat(0, 1)
     end
@@ -349,9 +379,3 @@ Events.OnGameStart.Add(gameStartUtils)
 Events.OnEnterVehicle.Add(playerEnteredVehicle)
 
 Events.EveryDays.Add(dailyUpdate)
-
-local function testFunction()
-    print(#world_wood_gasifiers)
-    dailyUpdate()
-    print(fuelExpired)
-end

@@ -19,7 +19,6 @@ module OffTheGrid {
         DisplayCategory = Junk,
         ItemType = base:normal,
         Weight = 0.5,
-		Tags = base:iscompostable,
         Icon = Ash,
         WorldStaticModel = Ash,
     }
@@ -38,4 +37,35 @@ module OffTheGrid {
         Icon = carvedBucketOfLyeWater,
         WorldStaticModel = BucketCarved,
     }
+
+    item Hominy {
+        DisplayCategory = Food,
+        ItemType = base:food,
+        EatType = EatSmall,
+        Icon = Hominy,
+        Weight = 0.025,
+        WorldStaticModel = DriedSoyBeans,
+        HungerChange = -6.0,
+        Calories = 26.0,
+        Carbohydrates = 7.0,
+        Lipids = 0.5,
+        Proteins = 1.2,
+        EvolvedRecipe = Soup:2;Stew:2,
+        FoodType = Vegetables,
+    }
+    
+	item lowTechMag1 {
+        DisplayCategory = RecipeResource,
+        ItemType = base:literature,
+        Weight = 0.5,
+        Icon = Magazine,
+        BoredomChange = -20,
+        StressChange = -15,
+        LearnedRecipes = craftWoodGasifier,
+        StaticModel = Magazine,
+        WorldStaticModel = MagazineGround,
+        Tags = base:magazine,
+        OnCreate = ItemCodeOnCreate.onCreateRecipeMagazine,
+    }
+
 }

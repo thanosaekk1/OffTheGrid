@@ -8,6 +8,8 @@ module OffTheGrid {
         time = 200,
         Tags = AnySurfaceCraft,
         category = Assembly,
+        AutoLearnAny = Mechanics:3,
+        xpAward = Mechanics:10,
 
         inputs {
             item 1 [Base.Mov_RecycleBin;Base.Mov_GreenGarbageBin;Base.Mov_PublicGarbageBin],
@@ -42,8 +44,8 @@ module OffTheGrid {
         }
         itemMapper bucketType
         {
-            OffTheGrid.BucketOfLyeWater = Base.Bucket;Base.BucketEmpty;Base.BucketWaterDebug,
             OffTheGrid.carvedBucketOfLyeWater = Base.BucketCarved,
+            default = OffTheGrid.BucketOfLyeWater,
         }
     }
 
@@ -93,6 +95,30 @@ module OffTheGrid {
         {
             Base.BucketCarvedClayCement = Base.BucketCarved,
             default = Base.BucketClayCement,
+        }
+    }
+
+    craftRecipe MakeHominy
+    {
+        timedAction = MixingBucket,
+        time = 50,
+        Tags = InHandCraft,
+        category = Cooking,
+        xpAward = Cooking:5,
+        inputs
+        {
+            item 1 [OffTheGrid.BucketOfLyeWater;OffTheGrid.carvedBucketOfLyeWater] mode:destroy mappers[bucketType],
+            item 10 [Base.CornSeed],
+        }
+        outputs
+        {
+            item 10 OffTheGrid.Hominy,
+            item 1 mapper:bucketType,
+        }
+        itemMapper bucketType
+        {
+            Base.BucketEmpty = OffTheGrid.BucketOfLyeWater,
+            Base.BucketCarved = OffTheGrid.carvedBucketOfLyeWater,
         }
     }
 }

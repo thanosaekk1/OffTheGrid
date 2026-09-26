@@ -1,9 +1,0 @@
-Sandbox_EN = {
-    Sandbox_OffTheGrid = "Off The Grid Mod",
-    Sandbox_OffTheGrid_GasifierFuelEfficiency = "Gasifier Fuel Efficiency",
-    Sandbox_OffTheGrid_GasifierFuelEfficiency_tooltip = "How much power is generated per unit of wood burned in a Wood Gasifier.",
-    Sandbox_OffTheGrid_GasolineExpirationDateStart = "Gasoline Expiration Date Start",
-    Sandbox_OffTheGrid_GasolineExpirationDateStart_tooltip = "The first day on which gasoline can go bad.",
-    Sandbox_OffTheGrid_GasolineExpirationDateEnd = "Gasoline Expiration Date End",
-    Sandbox_OffTheGrid_GasolineExpirationDateEnd_tooltip = "The last day on which gasoline can go bad.",
-}
