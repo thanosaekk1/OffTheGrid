@@ -1,5 +1,26 @@
 -- WOOD GASIFIER --
 
+local old_place_item = ISDropWorldItemAction.complete
+
+function ISDropWorldItemAction:complete() --inject when placing item to add the Gasifier to the world gasifier list
+    print("Hello there")
+    local retval = old_place_item(self)
+    if self.item:getFullType() == "OffTheGrid.WoodGasifier" then
+        local gasifier_pos = {
+            x = self.item:getWorldItem():getWorldPosX(),
+            y = self.item:getWorldItem():getWorldPosY(),
+            z = self.item:getWorldItem():getWorldPosZ()
+        }
+        print(gasifier_pos)
+        --local gasifier_pos = Vector3f.new(self.item:getWorldItem():getWorldPosX(), self.item:getWorldItem():getWorldPosY(), self.item:getWorldItem():getWorldPosZ())
+        if not gasifierExists(gasifier_pos) then
+            print("Sending storage info")
+            sendClientCommand(getPlayer(), "OffTheGrid", "StoreGasifierPosition", gasifier_pos)
+        end
+    end
+    return retval
+end
+
 local function playerPressedKey(key)
     if not getPlayer() then
         return false
@@ -10,7 +31,8 @@ local function playerPressedKey(key)
         if not carData.runningOnWood then --save the max theoretical speed (when starting)
             carData.ratedSpeed = playerCar:getMaxSpeed()
         end
-        CarRunWood(getPlayer():getVehicle())
+        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
+        --CarRunWood(getPlayer():getVehicle())
     end
 end
 

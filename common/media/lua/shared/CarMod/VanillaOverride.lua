@@ -1,3 +1,73 @@
+-- WOOD GASIFIER --
+
+-- FUEL EXPIRATION --
+
+local old_refuel_valid = ISRefuelFromGasPump.isValid
+local old_take_gas_valid = ISTakeGasolineFromVehicle.isValid
+local old_add_gas_valid = ISAddGasolineToVehicle.isValid
+local old_take_gas_pump_valid = ISTakeFuel.isValid
+local old_add_gen_fuel_valid = ISAddFuel.isValid
+
+function ISRefuelFromGasPump:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_refuel_valid(self)
+    end
+end
+
+function ISTakeGasolineFromVehicle:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_take_gas_valid(self)
+    end
+end
+
+function ISAddGasolineToVehicle:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_add_gas_valid(self)
+    end
+end
+
+function ISTakeFuel:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_take_gas_pump_valid(self)
+    end
+end
+
+function ISAddFuel:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_add_gen_fuel_valid(self)
+    end
+end
+
 -- REPLACING TRASH CANS WITH ORIGINAL ITEMS UPON PICKUP --
 
 -- straight up copying PZ code down here

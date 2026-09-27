@@ -7,11 +7,10 @@ wood_items = {"Base.Twigs", "Base.Splinters", "Base.Charcoal", "Base.CharcoalCra
 --in the future try sorting them by weight on startup so I don't have
 --to keep them properly ordered and can just chuck new ones at the end
 
-world_wood_gasifiers = {}
-
 local OTGData
 
 function CarRunWood(car)
+    print("CarRunWood is running")
     local trunk_container = car:getTrunkPart():getItemContainer()
     local gas_tank = car:getPartById("GasTank")
     local gas_level = gas_tank:getContainerContentAmount()
@@ -52,15 +51,6 @@ function CarRunWood(car)
             end
 
             gas_tank:setContainerContentAmount(gas_level + power_generated)
-            -- should do this instead for MP
-            --sendClientCommand(
-            --    "OffTheGrid",
-            --    "AddFuelToTank",
-            --    {
-            --        gasTank = gas_tank,
-            --        amount = power_generated
-            --    }
-            --)
 
             local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
             gasifier:Remove(wood_to_remove)
@@ -77,6 +67,23 @@ function CarRunWood(car)
         end
     end
 end
+
+local function onClientCommand(module, command, player, args)
+    print("Command called server-side")
+    if module ~= "OffTheGrid" then return end
+
+    if command == "CarRunWood" then
+        local playerCar = player:getVehicle()
+        CarRunWood(playerCar)
+    elseif command == "StoreGasifierPosition" then
+        local OTGData = ModData.getOrCreate("OffTheGridData")
+        table.insert(OTGData.gasifier_list, args)
+        print("Gasifiers: ", #OTGData.gasifier_list)
+        ModData.transmit("OffTheGridData")
+    end
+end
+
+Events.OnClientCommand.Add(onClientCommand)
 
 local function CarFuelCheck(player)
     local car = player:getVehicle()
@@ -175,14 +182,16 @@ local function GeneratorRunWood(gasifier_pos, generator)
 end
 
 local function GeneratorFuelCheck()
-    for i=1, #world_wood_gasifiers do
-        local gasifier_pos = world_wood_gasifiers[i]
+    local data = ModData.getOrCreate("OffTheGridData")
+    local gasifiers = data.gasifier_list or {}
+    for i=1, #gasifiers do
+        local gasifier_pos = gasifiers[i]
         if gasifier_pos then
             for pos_x = gasifier_pos.x-3, gasifier_pos.x+3 do
                 for pos_y = gasifier_pos.y-3, gasifier_pos.y+3 do
                     local target_square = getSquare(pos_x,pos_y, gasifier_pos.z)
                     if not target_square then return end
-                    local obj_list = target_square:getLuaTileObjectList() --causes error
+                    local obj_list = target_square:getLuaTileObjectList()
                     if not obj_list then return end
                     for j=1, #obj_list do
                         if obj_list[j]:getObjectName() == "IsoGenerator" then
@@ -211,30 +220,10 @@ end
 Events.OnPlayerUpdate.Add(CarFuelCheck)
 Events.OnPlayerUpdate.Add(GeneratorFuelCheck)
 
-local old_place_item = ISDropWorldItemAction.complete
-
-function ISDropWorldItemAction:complete() --inject when placing item to add the Gasifier to the world gasifier list
-    old_place_item(self)
-    if self.item:getFullType() == "OffTheGrid.WoodGasifier" then
-        local gasifier_pos = {
-            x = self.item:getWorldItem():getWorldPosX(),
-            y = self.item:getWorldItem():getWorldPosY(),
-            z = self.item:getWorldItem():getWorldPosZ()
-        }
-        --local gasifier_pos = Vector3f.new(self.item:getWorldItem():getWorldPosX(), self.item:getWorldItem():getWorldPosY(), self.item:getWorldItem():getWorldPosZ())
-        if not gasifierExists(gasifier_pos) then
-            table.insert(world_wood_gasifiers, gasifier_pos)
-            --save the gasifier position to mod data
-            local OTGData = ModData.getOrCreate("OffTheGridData")
-            OTGData.gasifier_list = world_wood_gasifiers
-            print("Gasifiers: ", #OTGData.gasifier_list)
-            ModData.transmit("OffTheGridData")
-        end
-    end
-end
-
 function gasifierExists (pos)
-    for _, existing in ipairs(world_wood_gasifiers) do
+    local data = ModData.getOrCreate("OffTheGridData")
+    local gasifiers = data.gasifier_list or {}
+    for _, existing in ipairs(gasifiers) do
         if existing.x == pos.x
         and existing.y == pos.y
         and existing.z == pos.z then
@@ -262,16 +251,21 @@ fuelExpirationEnd = SandboxVars.OffTheGrid.GasolineExpirationDateEnd
 fuelExpirationRoll = 0.0
 currentDay = 0
 
+print("Current day: ", currentDay)
+
 local function initUtils(newGame)
     OTGData = ModData.getOrCreate("OffTheGridData")
-    world_wood_gasifiers = OTGData.gasifier_list or {}
+    if not OTGData.gasifier_list then
+        OTGData.gasifier_list = {}
+    end
     if newGame then
         fuelExpirationRoll = ZombRandFloat(0, 1)
     end
 end
 
 local function gameStartUtils()
-    print("Gasifiers: ", #world_wood_gasifiers)
+    OTGData = ModData.getOrCreate("OffTheGridData")
+    print(#OTGData.gasifier_list)
     print("Fuel expires: ", fuelExpirationRoll)
 end
 
@@ -294,72 +288,6 @@ local function playerEnteredVehicle(character)
     if fuelExpired and car:getPartById("GasTank"):getContainerContentAmount() > 0.0 and not car.runningOnWood then
         character:addLineChatElement("The fuel in this has gone bad...")
         car:getPartById("GasTank"):setContainerContentAmount(0.0)
-    end
-end
-
-local old_refuel_valid = ISRefuelFromGasPump.isValid
-local old_take_gas_valid = ISTakeGasolineFromVehicle.isValid
-local old_add_gas_valid = ISAddGasolineToVehicle.isValid
-local old_take_gas_pump_valid = ISTakeFuel.isValid
-local old_add_gen_fuel_valid = ISAddFuel.isValid
-
-function ISRefuelFromGasPump:isValid()
-    if fuelExpired then
-        if not self._printed then
-            self.character:addLineChatElement("This fuel has gone bad...")
-            self._printed = true
-        end
-        return false
-    else
-        return old_refuel_valid(self)
-    end
-end
-
-function ISTakeGasolineFromVehicle:isValid()
-    if fuelExpired then
-        if not self._printed then
-            self.character:addLineChatElement("This fuel has gone bad...")
-            self._printed = true
-        end
-        return false
-    else
-        return old_take_gas_valid(self)
-    end
-end
-
-function ISAddGasolineToVehicle:isValid()
-    if fuelExpired then
-        if not self._printed then
-            self.character:addLineChatElement("This fuel has gone bad...")
-            self._printed = true
-        end
-        return false
-    else
-        return old_add_gas_valid(self)
-    end
-end
-
-function ISTakeFuel:isValid()
-    if fuelExpired then
-        if not self._printed then
-            self.character:addLineChatElement("This fuel has gone bad...")
-            self._printed = true
-        end
-        return false
-    else
-        return old_take_gas_pump_valid(self)
-    end
-end
-
-function ISAddFuel:isValid()
-    if fuelExpired then
-        if not self._printed then
-            self.character:addLineChatElement("This fuel has gone bad...")
-            self._printed = true
-        end
-        return false
-    else
-        return old_add_gen_fuel_valid(self)
     end
 end
 
