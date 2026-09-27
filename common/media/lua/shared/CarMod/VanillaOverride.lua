@@ -1,3 +1,5 @@
+-- REPLACING TRASH CANS WITH ORIGINAL ITEMS UPON PICKUP --
+
 -- straight up copying PZ code down here
 
 function ISMoveableSpriteProps:pickUpMoveableInternal( _character, _square, _object, _sprInstance, _spriteName, _createItem, _rotating )

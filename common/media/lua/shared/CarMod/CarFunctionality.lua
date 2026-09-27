@@ -4,13 +4,14 @@
 
 --@type String[]
 wood_items = {"Base.Twigs", "Base.Splinters", "Base.Charcoal", "Base.CharcoalCrafted", "Base.Plank_Broken", "Base.UnusableWood", "Base.TwigsBundle", "Base.TreeBranch2", "Base.Plank", "Base.FirewoodBundle", "Base.LargeBranch", "Base.Log", "Base.LogStacks2", "Base.LogStacks3", "Base.LogStacks4"}
---in the future try sorting them by weight on startup so they don't have to be ordered manually
+--in the future try sorting them by weight on startup so I don't have
+--to keep them properly ordered and can just chuck new ones at the end
 
 world_wood_gasifiers = {}
 
 local OTGData
 
-local function CarRunWood(car)
+function CarRunWood(car)
     local trunk_container = car:getTrunkPart():getItemContainer()
     local gas_tank = car:getPartById("GasTank")
     local gas_level = gas_tank:getContainerContentAmount()
@@ -31,14 +32,14 @@ local function CarRunWood(car)
     --check if the Gasifier isn't clogged with ashes
     local ash_content = gasifier:getNumberOfItem("OffTheGrid.Ash")
     if ash_content > 10 then
-        getPlayer():addLineChatElement("The gasifier's totally clogged...")
+        car:getDriver():addLineChatElement("The gasifier's totally clogged...")
         return false
     elseif ash_content > 5 then --close to max amount of ashes, some failures are possible
         local failure_roll = ZombRand(ash_content, 11)
         if failure_roll >= 10 then
             return false
         end
-        getPlayer():addLineChatElement("The gasifier's starting to clog...")
+        car:getDriver():addLineChatElement("The gasifier's starting to clog...")
     end
 
 	-- running out of gas, change to wood
@@ -49,11 +50,25 @@ local function CarRunWood(car)
             if item_to_burn:getFireFuelRatio() > 0 then
                 power_generated = power_generated * item_to_burn:getFireFuelRatio()
             end
+
             gas_tank:setContainerContentAmount(gas_level + power_generated)
-            gasifier:RemoveOneOf(wood_items[i])
+            -- should do this instead for MP
+            --sendClientCommand(
+            --    "OffTheGrid",
+            --    "AddFuelToTank",
+            --    {
+            --        gasTank = gas_tank,
+            --        amount = power_generated
+            --    }
+            --)
+
+            local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
+            gasifier:Remove(wood_to_remove)
+            --sendRemoveItemFromContainer(gasifier, wood_to_remove) -- FOR MP
             local ash_to_add = instanceItem("OffTheGrid.Ash")
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
+            --sendAddItemToContainer(gasifier, ash_to_add) -- FOR MP
             car:playSound("CampfireLight")
             --car:setEngineFeature(car:getEngineQuality(), 40, car:getEnginePower())
             car:getModData().runningOnWood = true
@@ -64,8 +79,8 @@ local function CarRunWood(car)
 end
 
 local function CarFuelCheck(player)
-    local car = getPlayer():getVehicle()
-    if not car or not getPlayer():isDriving() then
+    local car = player:getVehicle()
+    if not car or not player:isDriving() then
         return false
     else
         local carData = car:getModData()
@@ -86,9 +101,9 @@ local function CarFuelCheck(player)
             carData.runningOnWood = false
         end
         
-        local engineQual = car:getEngineQuality()
-        local engineLoud = carData.ratedLoudness
-        local enginePower = car:getEnginePower()
+        --local engineQual = car:getEngineQuality()
+        --local engineLoud = carData.ratedLoudness
+        --local enginePower = car:getEnginePower()
         --set performance
         if carData.runningOnWood then
             car:setMaxSpeed(carData.ratedSpeed/2)
@@ -193,41 +208,8 @@ local function GeneratorFuelCheck()
     end
 end
 
-local function playerPressedKey(key)
-    if not getPlayer() then
-        return false
-    end
-    local playerCar = getPlayer():getVehicle()
-    if playerCar and playerCar:getRemainingFuelPercentage()<0.01 and key == 17 then
-        local carData = playerCar:getModData()
-        if not carData.runningOnWood then --save the max theoretical speed (when starting)
-            carData.ratedSpeed = playerCar:getMaxSpeed()
-        end
-        CarRunWood(getPlayer():getVehicle())
-    end
-end
-
-local function carsHourUpdate()
-    --clear wood gas from cars that aren't running
-    local car_list = getWorld():getCell():getVehicles()
-
-    -- getVehicles was borked by 42.17
-
-    --for i=0, car_list:size() - 1 do
-    --    if (car_list:get(i):getModData()).runningOnWood then
-    --        if not car_list:get(i):isEngineWorking() then
-    --            (car_list:get(i):getPartById("GasTank")):setContainerContentAmount(0.0)
-    --        end
-    --    end
-    --end
-end
-
-Events.OnKeyStartPressed.Add(playerPressedKey)
-
 Events.OnPlayerUpdate.Add(CarFuelCheck)
 Events.OnPlayerUpdate.Add(GeneratorFuelCheck)
-
-Events.EveryHours.Add(carsHourUpdate)
 
 local old_place_item = ISDropWorldItemAction.complete
 
@@ -269,11 +251,6 @@ function arrayContains(arr, key)
     end
     return found
 end
-
----------------
--- COMPOSTER --
----------------
-
 
 -------------------------
 -- GASOLINE EXPIRATION --
@@ -324,11 +301,12 @@ local old_refuel_valid = ISRefuelFromGasPump.isValid
 local old_take_gas_valid = ISTakeGasolineFromVehicle.isValid
 local old_add_gas_valid = ISAddGasolineToVehicle.isValid
 local old_take_gas_pump_valid = ISTakeFuel.isValid
+local old_add_gen_fuel_valid = ISAddFuel.isValid
 
 function ISRefuelFromGasPump:isValid()
     if fuelExpired then
         if not self._printed then
-            getPlayer():addLineChatElement("This fuel has gone bad...")
+            self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
         end
         return false
@@ -340,7 +318,7 @@ end
 function ISTakeGasolineFromVehicle:isValid()
     if fuelExpired then
         if not self._printed then
-            getPlayer():addLineChatElement("This fuel has gone bad...")
+            self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
         end
         return false
@@ -352,7 +330,7 @@ end
 function ISAddGasolineToVehicle:isValid()
     if fuelExpired then
         if not self._printed then
-            getPlayer():addLineChatElement("This fuel has gone bad...")
+            self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
         end
         return false
@@ -364,12 +342,24 @@ end
 function ISTakeFuel:isValid()
     if fuelExpired then
         if not self._printed then
-            getPlayer():addLineChatElement("This fuel has gone bad...")
+            self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
         end
         return false
     else
         return old_take_gas_pump_valid(self)
+    end
+end
+
+function ISAddFuel:isValid()
+    if fuelExpired then
+        if not self._printed then
+            self.character:addLineChatElement("This fuel has gone bad...")
+            self._printed = true
+        end
+        return false
+    else
+        return old_add_gen_fuel_valid(self)
     end
 end
 
@@ -379,3 +369,68 @@ Events.OnGameStart.Add(gameStartUtils)
 Events.OnEnterVehicle.Add(playerEnteredVehicle)
 
 Events.EveryDays.Add(dailyUpdate)
+
+--local function carsHourUpdate()
+--    --clear wood gas from cars that aren't running
+--    local car_list = getWorld():getCell():getVehicles()
+--    print(car_list)
+--
+--    -- getVehicles was borked by 42.17
+--
+--    for i=0, car_list:size() - 1 do
+--        if (car_list:get(i):getModData()).runningOnWood then
+--            if not car_list:get(i):isEngineWorking() then
+--                (car_list:get(i):getPartById("GasTank")):setContainerContentAmount(0.0)
+--            end
+--        end
+--    end
+--end
+
+--Events.EveryHours.Add(carsHourUpdate)
+
+
+--local old_activate_generator = ISActivateGenerator.isValid
+--local old_take_generator = ISTakeGenerator.isValid
+--local old_fix_generator = ISFixGenerator.isValid
+--
+--function resetExpiredFuel(IsoGen)
+--    if fuelExpired then
+--        if not IsoGen:getModData().fuelFromWood then
+--            IsoGen:getModData().fuelFromWood = 0.0
+--        end
+--        IsoGen:setFuel(IsoGen:getModData().fuelFromWood)
+--    end
+--end
+--
+--function ISActivateGenerator:isValid()
+--    resetExpiredFuel(self.generator)
+--    return old_activate_generator(self)
+--end
+--
+--function ISTakeGenerator:isValid()
+--    resetExpiredFuel(self.generator)
+--    return old_take_generator(self)
+--end
+--
+--function ISFixGenerator:isValid()
+--    resetExpiredFuel(self.generator)
+--    return old_fix_generator(self)
+--end
+
+-- OVERRIDE HOOK TO DETECT ENGINE STARTING - DEPRECATED, ONLY SEEMS TO WORK WITH ENGINE BUTTON ON DASHBOARD
+
+--local old_start_vehicle_engine = ISStartVehicleEngine.isValid
+--
+--function ISStartVehicleEngine:isValid() --need to account for fuel running out while in the middle of a trip too
+--    local characterCar = self.character:getVehicle()
+--    if characterCar and characterCar:getRemainingFuelPercentage()<0.01 then
+--        local carData = characterCar:getModData()
+--        if not carData.runningOnWood then --save the max theoretical speed (when starting)
+--            carData.ratedSpeed = characterCar:getMaxSpeed()
+--        end
+--        CarRunWood(characterCar)
+--        return true --should it always return true?
+--    else
+--        return old_start_vehicle_engine(self)
+--    end
+--end

@@ -8,7 +8,9 @@ module OffTheGrid {
         time = 200,
         Tags = AnySurfaceCraft,
         category = Assembly,
-        AutoLearnAny = Mechanics:3,
+        SkillRequired = Mechanics:2,
+        NeedToBeLearn = true,
+        AutoLearnAll = Mechanics:4,
         xpAward = Mechanics:10,
 
         inputs {
