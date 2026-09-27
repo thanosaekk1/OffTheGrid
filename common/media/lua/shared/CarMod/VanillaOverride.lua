@@ -7,9 +7,11 @@ local old_take_gas_valid = ISTakeGasolineFromVehicle.isValid
 local old_add_gas_valid = ISAddGasolineToVehicle.isValid
 local old_take_gas_pump_valid = ISTakeFuel.isValid
 local old_add_gen_fuel_valid = ISAddFuel.isValid
+local old_finish_fueling_vehicle = ISAddGasolineToVehicle.complete
 
 function ISRefuelFromGasPump:isValid()
-    if fuelExpired then
+    local OTGData = ModData.getOrCreate("OffTheGridData")
+    if OTGData.fuelExpired then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -21,7 +23,8 @@ function ISRefuelFromGasPump:isValid()
 end
 
 function ISTakeGasolineFromVehicle:isValid()
-    if fuelExpired then
+    local OTGData = ModData.getOrCreate("OffTheGridData")
+    if OTGData.fuelExpired then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -33,7 +36,8 @@ function ISTakeGasolineFromVehicle:isValid()
 end
 
 function ISAddGasolineToVehicle:isValid()
-    if fuelExpired then
+    local OTGData = ModData.getOrCreate("OffTheGridData")
+    if OTGData.fuelExpired then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -45,7 +49,8 @@ function ISAddGasolineToVehicle:isValid()
 end
 
 function ISTakeFuel:isValid()
-    if fuelExpired then
+    local OTGData = ModData.getOrCreate("OffTheGridData")
+    if OTGData.fuelExpired then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -57,7 +62,8 @@ function ISTakeFuel:isValid()
 end
 
 function ISAddFuel:isValid()
-    if fuelExpired then
+    local OTGData = ModData.getOrCreate("OffTheGridData")
+    if OTGData.fuelExpired then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -66,6 +72,13 @@ function ISAddFuel:isValid()
     else
         return old_add_gen_fuel_valid(self)
     end
+end
+
+function ISAddGasolineToVehicle:complete()
+    local carData = self.vehicle:getModData()
+    carData.runningOnWood = false
+    carData:transmitModData()
+    return old_finish_fueling_vehicle(self)
 end
 
 -- REPLACING TRASH CANS WITH ORIGINAL ITEMS UPON PICKUP --

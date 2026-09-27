@@ -3,7 +3,7 @@
 local old_place_item = ISDropWorldItemAction.complete
 
 function ISDropWorldItemAction:complete() --inject when placing item to add the Gasifier to the world gasifier list
-    print("Hello there")
+    print("Item placed")
     local retval = old_place_item(self)
     if self.item:getFullType() == "OffTheGrid.WoodGasifier" then
         local gasifier_pos = {
@@ -12,11 +12,8 @@ function ISDropWorldItemAction:complete() --inject when placing item to add the 
             z = self.item:getWorldItem():getWorldPosZ()
         }
         print(gasifier_pos)
-        --local gasifier_pos = Vector3f.new(self.item:getWorldItem():getWorldPosX(), self.item:getWorldItem():getWorldPosY(), self.item:getWorldItem():getWorldPosZ())
-        if not gasifierExists(gasifier_pos) then
-            print("Sending storage info")
-            sendClientCommand(getPlayer(), "OffTheGrid", "StoreGasifierPosition", gasifier_pos)
-        end
+        print("Sending storage info")
+        sendClientCommand(getPlayer(), "OffTheGrid", "StoreGasifierPosition", gasifier_pos)
     end
     return retval
 end
@@ -26,17 +23,27 @@ local function playerPressedKey(key)
         return false
     end
     local playerCar = getPlayer():getVehicle()
-    if playerCar and playerCar:getRemainingFuelPercentage()<0.01 and key == 17 then
+    if playerCar and playerCar:getRemainingFuelPercentage()<1.0 and key == 17 then
         local carData = playerCar:getModData()
         if not carData.runningOnWood then --save the max theoretical speed (when starting)
             carData.ratedSpeed = playerCar:getMaxSpeed()
         end
-        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
+        print("Client-side command called")
+        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {max_speed=carData.ratedSpeed})
         --CarRunWood(getPlayer():getVehicle())
     end
 end
 
 Events.OnKeyStartPressed.Add(playerPressedKey)
+
+-- FUEL EXPIRATION --
+
+--local function ReceiveModData(key, data)
+--    if key ~= "OffTheGridData" then return end
+--
+--end
+--
+--Events.OnReceiveGlobalModData.Add(ReceiveModData)
 
 -- COMPOSTER --
 
