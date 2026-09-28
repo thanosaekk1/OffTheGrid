@@ -12,7 +12,11 @@ local OTGData
 function CarRunWood(car)
     local trunk_container = car:getTrunkPart():getItemContainer()
     local gas_tank = car:getPartById("GasTank")
+    if not gas_tank then return false end
     local gas_level = gas_tank:getContainerContentAmount()
+    if gas_level > 0.01 then --checking for level here because client-level checks were acting up
+        return false
+    end
     if not trunk_container:contains("OffTheGrid.WoodGasifier") then
         return false
     end
@@ -48,8 +52,11 @@ function CarRunWood(car)
             if item_to_burn:getFireFuelRatio() > 0 then
                 power_generated = power_generated * item_to_burn:getFireFuelRatio()
             end
-
-            gas_tank:setContainerContentAmount(gas_level + power_generated)
+            
+            print("Before: ", gas_tank:getContainerContentAmount())
+            print("Input: ", gas_level)
+            gas_tank:setContainerContentAmount(gas_level + power_generated, true, true)
+            print("After: ", gas_tank:getContainerContentAmount())
             car:transmitPartModData(gas_tank) --necessary?
 
             local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
@@ -76,7 +83,6 @@ local function onClientCommand(module, command, player, args)
 
     if command == "CarRunWood" then
         local playerCar = player:getVehicle()
-        print("kicking off with wood power...")
         CarRunWood(playerCar)
     elseif command == "StoreGasifierPosition" then
         print("storing gasifier position...")
@@ -97,7 +103,6 @@ local function CarFuelCheck(player)
         return false
     else
         local carData = car:getModData()
-        print(carData.runningOnWood)
         if not carData.fuelFromWood then
             carData.fuelFromWood = 0.0
         end
@@ -106,8 +111,7 @@ local function CarFuelCheck(player)
             carData.ratedLoudness = car:getEngineLoudness()
         end
         
-        if car:getRemainingFuelPercentage()<0.01 and car:isEngineRunning() then
-            print("running out of wood mid-road...")
+        if car:isEngineRunning() then
             CarRunWood(car)
         end
 
@@ -119,17 +123,17 @@ local function CarFuelCheck(player)
         --end
         
         --set performance
+        if not carData.ratedSpeed then
+            carData.ratedSpeed = car:getMaxSpeed()
+        end
         if carData.runningOnWood then
             -- constantly fails to implement on MP
-            car:setMaxSpeed(carData.ratedSpeed/2)
-            print("Limited speed: ", car:getMaxSpeed())
-            --print(car:getMaxSpeed())
+            car:setMaxSpeed(carData.ratedSpeed * 0.5)
             carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
             --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
         else
             --print("Performance set to original")
             car:setMaxSpeed(carData.ratedSpeed)
-            print("Full speed: ", car:getMaxSpeed())
         end
         --carData.transmit()
     end

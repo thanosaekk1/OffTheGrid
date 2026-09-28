@@ -6,13 +6,14 @@ local function playerPressedKey(key)
         return false
     end
     local playerCar = getPlayer():getVehicle()
-    if playerCar and playerCar:getSeat(getPlayer()) == 0 and playerCar:getRemainingFuelPercentage()<0.01 and key == 17 then
-        --("Trying to start car...", playerCar:getRemainingFuelPercentage())
+    local gasThreshold
+    if playerCar and playerCar:getSeat(getPlayer()) == 0 and key == 17 then --proceed regardless of amount in the gas tank
+        --print("Trying to start car...", playerCar:getRemainingFuelPercentage())
         local carData = playerCar:getModData()
         if not carData.runningOnWood then --save the max theoretical speed (when starting)
             carData.ratedSpeed = playerCar:getMaxSpeed()
         end
-        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {max_speed=carData.ratedSpeed})
+        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
         --CarRunWood(getPlayer():getVehicle())
     end
 end
