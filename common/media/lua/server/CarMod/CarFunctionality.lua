@@ -10,7 +10,6 @@ wood_items = {"Base.Twigs", "Base.Splinters", "Base.Charcoal", "Base.CharcoalCra
 local OTGData
 
 function CarRunWood(car)
-    print("CarRunWood is running")
     local trunk_container = car:getTrunkPart():getItemContainer()
     local gas_tank = car:getPartById("GasTank")
     local gas_level = gas_tank:getContainerContentAmount()
@@ -64,7 +63,8 @@ function CarRunWood(car)
             --car:setEngineFeature(car:getEngineQuality(), 40, car:getEnginePower())
             car:getModData().runningOnWood = true
             car:getModData().fuelFromWood = gas_tank:getContainerContentAmount()
-            print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
+            print("Found wood to burn...")
+            car:transmitModData()
             break
         end
     end
@@ -76,13 +76,15 @@ local function onClientCommand(module, command, player, args)
 
     if command == "CarRunWood" then
         local playerCar = player:getVehicle()
+        print("kicking off with wood power...")
         CarRunWood(playerCar)
     elseif command == "StoreGasifierPosition" then
-        local OTGData = ModData.getOrCreate("OffTheGridData")
+        print("storing gasifier position...")
+        local Data = ModData.getOrCreate("OffTheGridData")
         if not gasifierExists(args) then
-            table.insert(OTGData.gasifier_list, args)
+            table.insert(Data.gasifier_list, args)
         end
-        print("Gasifiers: ", #OTGData.gasifier_list)
+        print("Gasifiers: ", #Data.gasifier_list)
         ModData.transmit("OffTheGridData")
     end
 end
@@ -95,6 +97,7 @@ local function CarFuelCheck(player)
         return false
     else
         local carData = car:getModData()
+        print(carData.runningOnWood)
         if not carData.fuelFromWood then
             carData.fuelFromWood = 0.0
         end
@@ -104,6 +107,7 @@ local function CarFuelCheck(player)
         end
         
         if car:getRemainingFuelPercentage()<0.01 and car:isEngineRunning() then
+            print("running out of wood mid-road...")
             CarRunWood(car)
         end
 
@@ -116,16 +120,22 @@ local function CarFuelCheck(player)
         
         --set performance
         if carData.runningOnWood then
+            -- constantly fails to implement on MP
             car:setMaxSpeed(carData.ratedSpeed/2)
+            print("Limited speed: ", car:getMaxSpeed())
+            --print(car:getMaxSpeed())
             carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
             --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
         else
+            --print("Performance set to original")
             car:setMaxSpeed(carData.ratedSpeed)
+            print("Full speed: ", car:getMaxSpeed())
         end
+        --carData.transmit()
     end
 end
 
-local function GeneratorRunWood(gasifier_pos, generator)
+function GeneratorRunWood(gasifier_pos, generator)
     local gasifier_square = getSquare(gasifier_pos.x, gasifier_pos.y, gasifier_pos.z)
     local obj_list = gasifier_square:getLuaTileObjectList()
     local gasifier
@@ -161,13 +171,13 @@ local function GeneratorRunWood(gasifier_pos, generator)
             end
             local gas_level = generator:getFuel()
             generator:setFuel(gas_level + power_generated)
+            local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
             gasifier:RemoveOneOf(wood_items[i])
             local ash_to_add = instanceItem("OffTheGrid.Ash")
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
             gasifier_square:playSoundLocal("FireplaceAddFuel")
             local genCondition = generator:getCondition()
-            print(genCondition)
             generator:setCondition(genCondition - 2) -- burning wood causes condition to deteriorate faster
             generator:getModData().fuelFromWood = generator:getFuelPercentage()
             break
@@ -175,33 +185,35 @@ local function GeneratorRunWood(gasifier_pos, generator)
     end
 end
 
-local function GeneratorFuelCheck()
+local function GeneratorFuelCheck() -- def runs client-side hence why it doesn't detect any gasifiers
     local data = ModData.getOrCreate("OffTheGridData")
-    local gasifiers = data.gasifier_list or {}
-    --print(#gasifiers)
+    if not data then return end
+    local gasifiers = data.gasifier_list
     for i=1, #gasifiers do
         local gasifier_pos = gasifiers[i]
         if gasifier_pos then
             for pos_x = gasifier_pos.x-3, gasifier_pos.x+3 do
                 for pos_y = gasifier_pos.y-3, gasifier_pos.y+3 do
                     local target_square = getSquare(pos_x,pos_y, gasifier_pos.z)
-                    if not target_square then return end
-                    local obj_list = target_square:getLuaTileObjectList()
-                    if not obj_list then return end
-                    for j=1, #obj_list do
-                        if obj_list[j]:getObjectName() == "IsoGenerator" then
-                            local generator = obj_list[j]
-                            if generator then
-                                local generatorData = generator:getModData() 
-                                if not generatorData.fuelFromWood then
-                                    generatorData.fuelFromWood = 0.0
-                                end
-                                if generator:isConnected() and generator:getFuelPercentage()<0.01 then
-                                    -- will burn wood without being turned on
-                                    GeneratorRunWood(gasifier_pos, generator)
-                                end
-                                if generator:getFuelPercentage() > generatorData.fuelFromWood then
-                                    -- external refill happened
+                    if target_square then
+                        local obj_list = target_square:getLuaTileObjectList()
+                        if obj_list then
+                            for j=1, #obj_list do
+                                if obj_list[j]:getObjectName() == "IsoGenerator" then
+                                    local generator = obj_list[j]
+                                    if generator then
+                                        local generatorData = generator:getModData() 
+                                        if not generatorData.fuelFromWood then
+                                            generatorData.fuelFromWood = 0.0
+                                        end
+                                        if generator:isConnected() and generator:getFuelPercentage()<0.01 then
+                                            -- will burn wood without being turned on
+                                            GeneratorRunWood(gasifier_pos, generator)
+                                        end
+                                        if generator:getFuelPercentage() > generatorData.fuelFromWood then
+                                            -- external refill happened
+                                        end
+                                    end
                                 end
                             end
                         end
@@ -212,8 +224,9 @@ local function GeneratorFuelCheck()
     end
 end
 
+Events.EveryOneMinute.Add(GeneratorFuelCheck)
+
 Events.OnPlayerUpdate.Add(CarFuelCheck)
-Events.OnPlayerUpdate.Add(GeneratorFuelCheck)
 
 function gasifierExists (pos)
     local data = ModData.getOrCreate("OffTheGridData")
@@ -257,12 +270,13 @@ end
 
 local function gameStartUtils()
     OTGData = ModData.getOrCreate("OffTheGridData")
-    print(#OTGData.gasifier_list)
+    print("Gasifiers: ",#OTGData.gasifier_list)
     print("Fuel expires: ", OTGData.fuelExpirationRoll)
 end
 
 local function dailyUpdate()
     OTGData = ModData.getOrCreate("OffTheGridData")
+    OTGData.currentDay = OTGData.currentDay or 0
     OTGData.currentDay = OTGData.currentDay + 1
     if OTGData.currentDay >= OTGData.fuelExpirationStart then
         if OTGData.fuelExpirationEnd == OTGData.fuelExpirationStart then-- avoid dividing by zero
@@ -277,20 +291,8 @@ local function dailyUpdate()
     ModData.transmit("OffTheGridData")
 end
 
-local function playerEnteredVehicle(character)
-    OTGData = ModData.getOrCreate("OffTheGridData")
-    local car = character:getVehicle()
-    if not car then return false end
-    if OTGData.fuelExpired and car:getPartById("GasTank"):getContainerContentAmount() > 0.0 and not car.runningOnWood then
-        character:addLineChatElement("The fuel in this has gone bad...")
-        car:getPartById("GasTank"):setContainerContentAmount(0.0)
-    end
-end
-
 Events.OnInitGlobalModData.Add(initUtils)
 Events.OnGameStart.Add(gameStartUtils)
-
-Events.OnEnterVehicle.Add(playerEnteredVehicle)
 
 Events.EveryDays.Add(dailyUpdate)
 
