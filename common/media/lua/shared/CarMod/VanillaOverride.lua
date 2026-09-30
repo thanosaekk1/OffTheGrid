@@ -3,6 +3,7 @@
 -- FUEL EXPIRATION --
 
 local old_refuel_valid = ISRefuelFromGasPump.isValid
+local old_refuel_complete = ISRefuelFromGasPump.complete
 local old_take_gas_valid = ISTakeGasolineFromVehicle.isValid
 local old_add_gas_valid = ISAddGasolineToVehicle.isValid
 local old_take_gas_pump_valid = ISTakeFuel.isValid
@@ -20,6 +21,15 @@ function ISRefuelFromGasPump:isValid()
     else
         return old_refuel_valid(self)
     end
+end
+
+function ISRefuelFromGasPump:complete()
+    local carData = self.vehicle:getModData()
+    if carData then
+        carData.runningOnWood = false
+        carData:transmitModData()
+    end
+    return old_refuel_complete(self)
 end
 
 function ISTakeGasolineFromVehicle:isValid()
@@ -76,8 +86,10 @@ end
 
 function ISAddGasolineToVehicle:complete()
     local carData = self.vehicle:getModData()
-    carData.runningOnWood = false
-    carData:transmitModData()
+    if carData then
+        carData.runningOnWood = false
+        carData:transmitModData()
+    end
     return old_finish_fueling_vehicle(self)
 end
 

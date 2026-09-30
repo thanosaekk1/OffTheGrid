@@ -31,11 +31,7 @@ function CarRunWood(car, changeTank)
 	if not gasifier then
 		return 0
 	end
-    --local current_time = getTimestampMs()
-    --if car:getModData().last_burn_time and current_time - car:getModData().last_burn_time < wood_burn_cooldown then
-    --    -- check to prevent unnecessary wood burns on sequential ticks
-    --    return 0
-    --end
+
     --check if the Gasifier isn't clogged with ashes
     local ash_content = gasifier:getNumberOfItem("OffTheGrid.Ash")
     if ash_content > 10 then
@@ -58,11 +54,9 @@ function CarRunWood(car, changeTank)
                 power_generated = power_generated * item_to_burn:getFireFuelRatio()
             end
             
-            --sendServerCommand(car:getDriver(), "OffTheGrid", "AddFuel", { amount = power_generated })
             if changeTank then
                 gas_tank:setContainerContentAmount(gas_level + power_generated, true, true)
                 car:transmitPartModData(gas_tank) --might be necessary for MP
-                car:getModData().fuelFromWood = gas_tank:getContainerContentAmount()
                 --print("-> Changed gas tank contents")
             end
 
@@ -80,11 +74,9 @@ function CarRunWood(car, changeTank)
             end
             --car:setEngineFeature(car:getEngineQuality(), 40, car:getEnginePower())
             car:getModData().runningOnWood = true
-            --car:getModData().last_burn_time = current_time
             car:transmitModData()
             --print("Found wood to burn...")
             return power_generated
-            --break
         end
     end
     return 0
@@ -115,13 +107,12 @@ local function CarFuelCheck(player)
     else
         --print("client tank", car:getPartById("GasTank"):getContainerContentAmount())
         local carData = car:getModData()
-        if not carData.fuelFromWood then
-            carData.fuelFromWood = 0.0
-        end
-        if not carData.runningOnWood then --save the max theoretical speed and loudness
-            carData.ratedSpeed = car:getMaxSpeed()
-            carData.ratedLoudness = car:getEngineLoudness()
-        end
+        --if carData.runningOnWood then --save the max theoretical speed and loudness
+        --    carData.ratedSpeed = car:getMaxSpeed() * 2
+        --    --carData.ratedLoudness = car:getEngineLoudness()
+        --else
+        --    carData.ratedSpeed = car:getMaxSpeed()
+        --end
         
         -- BUSY WAIT CHECK, CHANGE LATER
         --if car:isEngineRunning() and car:getPartById('GasTank'):getContainerContentAmount() < 0.01 then
@@ -142,13 +133,13 @@ local function CarFuelCheck(player)
         --end
         --if carData.runningOnWood then
         --    car:setMaxSpeed(carData.ratedSpeed * 0.5)
-        --    carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
+        --    --carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
         --    --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
         --else
         --    --print("Performance set to original")
         --    car:setMaxSpeed(carData.ratedSpeed)
         --end
-        --carData.transmit()
+        car:transmitModData()
     end
 end
 
@@ -316,7 +307,7 @@ end
 
 Events.EveryOneMinute.Add(GeneratorFuelCheck)
 
-Events.OnPlayerUpdate.Add(CarFuelCheck)
+--Events.OnPlayerUpdate.Add(CarFuelCheck)
 
 function gasifierExists (pos)
     local data = ModData.getOrCreate("OffTheGridData")

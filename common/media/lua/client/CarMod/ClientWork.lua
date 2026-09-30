@@ -8,9 +8,11 @@ local function playerPressedKey(key)
     local playerCar = getPlayer():getVehicle()
     if playerCar and playerCar:getSeat(getPlayer()) == 0 and key == 17 then --proceed regardless of amount in the gas tank
         local carData = playerCar:getModData()
-        if not carData.runningOnWood then --save the max theoretical speed (when starting)
-            carData.ratedSpeed = playerCar:getMaxSpeed()
-        end
+        --if carData.runningOnWood then --save the max theoretical speed (when starting)
+        --    carData.ratedSpeed = playerCar:getMaxSpeed() * 2
+        --else
+        --    carData.ratedSpeed = playerCar:getMaxSpeed()
+        --end
         local fuel_lvl = playerCar:getPartById('GasTank'):getContainerContentAmount()
         --print(fuel_lvl)
         -- give the car a small amount so the engine can start and we'll see whether it keeps that
@@ -41,6 +43,14 @@ local function playerEnteredVehicle(character)
         character:addLineChatElement("The fuel in this has gone bad...")
         car:getPartById("GasTank"):setContainerContentAmount(0.0)
         car:transmitPartModData(car:getPartById("GasTank")) --might be necessary for MP
+
+        --local carData = car:getModData()
+        --if carData.runningOnWood then
+        --    carData.ratedSpeed = car:getMaxSpeed() * 2
+        --else
+        --    carData.ratedSpeed = car:getMaxSpeed()
+        --end
+        --car:transmitModData()
     end
 end
 
