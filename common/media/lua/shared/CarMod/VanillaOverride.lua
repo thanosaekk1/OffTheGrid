@@ -11,7 +11,7 @@ local old_finish_fueling_vehicle = ISAddGasolineToVehicle.complete
 
 function ISRefuelFromGasPump:isValid()
     local OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.fuelExpired then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -24,7 +24,7 @@ end
 
 function ISTakeGasolineFromVehicle:isValid()
     local OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.fuelExpired then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -37,7 +37,7 @@ end
 
 function ISAddGasolineToVehicle:isValid()
     local OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.fuelExpired then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -50,7 +50,7 @@ end
 
 function ISTakeFuel:isValid()
     local OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.fuelExpired then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true
@@ -63,7 +63,7 @@ end
 
 function ISAddFuel:isValid()
     local OTGData = ModData.getOrCreate("OffTheGridData")
-    if OTGData.fuelExpired then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() then
         if not self._printed then
             self.character:addLineChatElement("This fuel has gone bad...")
             self._printed = true

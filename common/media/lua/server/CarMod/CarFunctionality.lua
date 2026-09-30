@@ -9,16 +9,16 @@ wood_items = {"Base.Twigs", "Base.Splinters", "Base.Charcoal", "Base.CharcoalCra
 
 local OTGData
 
-function CarRunWood(car)
+--local wood_burn_cooldown = 1000
+function CarRunWood(car, changeTank)
     local trunk_container = car:getTrunkPart():getItemContainer()
     local gas_tank = car:getPartById("GasTank")
-    if not gas_tank then return false end
+    if not gas_tank then return 0 end
     local gas_level = gas_tank:getContainerContentAmount()
-    if gas_level > 0.01 then --checking for level here because client-level checks were acting up
-        return false
-    end
+    print("CarRunWood executed - Gas: ", gas_level)
+    -- client requests from tapping W cause weird executions where none of the car's data gets passed, leading to unnecessary wood burns
     if not trunk_container:contains("OffTheGrid.WoodGasifier") then
-        return false
+        return 0
     end
 	local trunk_contents = trunk_container:getItems()
     local gasifier
@@ -29,17 +29,22 @@ function CarRunWood(car)
         end
 	end
 	if not gasifier then
-		return false
+		return 0
 	end
+    --local current_time = getTimestampMs()
+    --if car:getModData().last_burn_time and current_time - car:getModData().last_burn_time < wood_burn_cooldown then
+    --    -- check to prevent unnecessary wood burns on sequential ticks
+    --    return 0
+    --end
     --check if the Gasifier isn't clogged with ashes
     local ash_content = gasifier:getNumberOfItem("OffTheGrid.Ash")
     if ash_content > 10 then
         car:getDriver():addLineChatElement("The gasifier's totally clogged...")
-        return false
+        return 0
     elseif ash_content > 5 then --close to max amount of ashes, some failures are possible
         local failure_roll = ZombRand(ash_content, 11)
         if failure_roll >= 10 then
-            return false
+            return 0
         end
         car:getDriver():addLineChatElement("The gasifier's starting to clog...")
     end
@@ -53,11 +58,13 @@ function CarRunWood(car)
                 power_generated = power_generated * item_to_burn:getFireFuelRatio()
             end
             
-            print("Before: ", gas_tank:getContainerContentAmount())
-            print("Input: ", gas_level)
-            gas_tank:setContainerContentAmount(gas_level + power_generated, true, true)
-            print("After: ", gas_tank:getContainerContentAmount())
-            car:transmitPartModData(gas_tank) --necessary?
+            --sendServerCommand(car:getDriver(), "OffTheGrid", "AddFuel", { amount = power_generated })
+            if changeTank then
+                gas_tank:setContainerContentAmount(gas_level + power_generated, true, true)
+                car:transmitPartModData(gas_tank) --might be necessary for MP
+                car:getModData().fuelFromWood = gas_tank:getContainerContentAmount()
+                --print("-> Changed gas tank contents")
+            end
 
             local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
             gasifier:Remove(wood_to_remove)
@@ -66,31 +73,35 @@ function CarRunWood(car)
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
             sendAddItemToContainer(gasifier, ash_to_add) -- FOR MP
-            car:playSound("CampfireLight")
+            if isServer() then
+                sendServerCommand("OffTheGrid", "CarBurnSound", {vehicleId = car:getId()})
+            else
+                car:playSound("CampfireLight")
+            end
             --car:setEngineFeature(car:getEngineQuality(), 40, car:getEnginePower())
             car:getModData().runningOnWood = true
-            car:getModData().fuelFromWood = gas_tank:getContainerContentAmount()
-            print("Found wood to burn...")
+            --car:getModData().last_burn_time = current_time
             car:transmitModData()
-            break
+            --print("Found wood to burn...")
+            return power_generated
+            --break
         end
     end
+    return 0
 end
 
 local function onClientCommand(module, command, player, args)
-    print("Command called server-side")
     if module ~= "OffTheGrid" then return end
 
     if command == "CarRunWood" then
         local playerCar = player:getVehicle()
-        CarRunWood(playerCar)
+        if not playerCar then return end
+        CarRunWood(playerCar, true)
     elseif command == "StoreGasifierPosition" then
-        print("storing gasifier position...")
         local Data = ModData.getOrCreate("OffTheGridData")
         if not gasifierExists(args) then
             table.insert(Data.gasifier_list, args)
         end
-        print("Gasifiers: ", #Data.gasifier_list)
         ModData.transmit("OffTheGridData")
     end
 end
@@ -102,6 +113,7 @@ local function CarFuelCheck(player)
     if not car or not player:isDriving() then
         return false
     else
+        --print("client tank", car:getPartById("GasTank"):getContainerContentAmount())
         local carData = car:getModData()
         if not carData.fuelFromWood then
             carData.fuelFromWood = 0.0
@@ -111,9 +123,10 @@ local function CarFuelCheck(player)
             carData.ratedLoudness = car:getEngineLoudness()
         end
         
-        if car:isEngineRunning() then
-            CarRunWood(car)
-        end
+        -- BUSY WAIT CHECK, CHANGE LATER
+        --if car:isEngineRunning() and car:getPartById('GasTank'):getContainerContentAmount() < 0.01 then
+        --    sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
+        --end
 
         -- CHECK FOR EXTERNAL REFILL - TEMPORARILY MOVED TO VANILLA OVERRIDE
         --if car:getPartById("GasTank"):getContainerContentAmount() > carData.fuelFromWood then
@@ -123,20 +136,93 @@ local function CarFuelCheck(player)
         --end
         
         --set performance
-        if not carData.ratedSpeed then
-            carData.ratedSpeed = car:getMaxSpeed()
-        end
-        if carData.runningOnWood then
-            -- constantly fails to implement on MP
-            car:setMaxSpeed(carData.ratedSpeed * 0.5)
-            carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
-            --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
-        else
-            --print("Performance set to original")
-            car:setMaxSpeed(carData.ratedSpeed)
-        end
+        -- RE-ADD LATER
+        --if not carData.ratedSpeed then
+        --    carData.ratedSpeed = car:getMaxSpeed()
+        --end
+        --if carData.runningOnWood then
+        --    car:setMaxSpeed(carData.ratedSpeed * 0.5)
+        --    carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
+        --    --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
+        --else
+        --    --print("Performance set to original")
+        --    car:setMaxSpeed(carData.ratedSpeed)
+        --end
         --carData.transmit()
     end
+end
+
+-- CODE COPIED FROM VANILLA AND EDITED FOR OWN NEEDS
+function Vehicles.Update.GasTank(vehicle, part, elapsedMinutes)
+	local invItem = part:getInventoryItem();
+	if not invItem then return; end
+	local amount = part:getContainerContentAmount()
+	if elapsedMinutes > 0 and amount > 0 and vehicle:isEngineRunning() then
+		local amountOld = amount
+		-- calcul how much gas is used, based mainly on engine speed, engine quality & mass.
+		local gasMultiplier = 90000;
+		-- heater consume more gas
+		local heater = vehicle:getHeater();
+		if heater and heater:getModData().active then
+			gasMultiplier = gasMultiplier - 5000;
+		end
+		-- if quality is 60, we do: 100 - 60 = 40; 40/2 = 20; 20/100=0.2; 0.2+1 = 1.2 : our multiplier;
+		local qualityMultiplier = ((100 - vehicle:getEngineQuality()) / 200) + 1;
+		local massMultiplier =  ((math.abs(1000 - vehicle:getScript():getMass())) / 300) + 1;
+		-- the closer we are to change shift, the less we consume gas
+		local speedToNextTransmission = ((vehicle:getMaxSpeed() / vehicle:getScript():getGearRatioCount()) * 0.71) * vehicle:getTransmissionNumber();
+		local speedMultiplier = (speedToNextTransmission - vehicle:getCurrentSpeedKmHour()) * 350;
+		-- if vehicle is stopped, we half the value of gas consummed
+		if math.floor(vehicle:getCurrentSpeedKmHour()) > 0 then
+			gasMultiplier = gasMultiplier / qualityMultiplier / massMultiplier;
+		else
+			gasMultiplier = (gasMultiplier / qualityMultiplier) * 2;
+			speedMultiplier = 1;
+		end
+		-- we're at max gear, cap general gas consumption
+		if speedMultiplier < 800 and speedMultiplier ~= 1 then
+			speedMultiplier = 800;
+		end
+
+        if speedMultiplier == 1 then -- we're idling, need to increase the fuel consumption still
+            speedMultiplier = 300;
+        end
+
+		local newAmount = (speedMultiplier / gasMultiplier)  * SandboxVars.CarGasConsumption;
+		newAmount =  newAmount * (vehicle:getEngineSpeed()/2500.0);
+		amount = amount - elapsedMinutes * newAmount;
+	
+		-- if your gas tank is in bad condition, you can simply lose fuel
+		if part:getCondition() < 70 then
+			if ZombRand(part:getCondition() * 2) == 0 then
+				amount = amount - 0.01;
+			end
+		end
+        
+        -- ############################
+        -- OTG: the mod intervenes here
+
+        print("Gas tank update: ", part:getContainerContentAmount(), " --> ", amount)
+        while amount < 0.01 do --try to run wood
+            local fuel_gained = CarRunWood(vehicle, false)
+            amount = amount + fuel_gained
+            print("Amount after OTG intervention: ", amount)
+            if fuel_gained == 0 then
+                break
+            end
+        end
+
+        -- OTG: end of intervention
+        -- ########################
+        
+		part:setContainerContentAmount(amount, false, true);
+
+		amount = part:getContainerContentAmount();
+		local precision = (amount < 0.5) and 2 or 1
+		if VehicleUtils.compareFloats(amountOld, amount, precision) then
+			vehicle:transmitPartModData(part)
+		end
+	end
 end
 
 function GeneratorRunWood(gasifier_pos, generator)
@@ -189,7 +275,7 @@ function GeneratorRunWood(gasifier_pos, generator)
     end
 end
 
-local function GeneratorFuelCheck() -- def runs client-side hence why it doesn't detect any gasifiers
+local function GeneratorFuelCheck() -- runs client-side
     local data = ModData.getOrCreate("OffTheGridData")
     if not data then return end
     local gasifiers = data.gasifier_list
@@ -262,43 +348,19 @@ local function initUtils(newGame)
     if not OTGData.gasifier_list then
         OTGData.gasifier_list = {}
     end
-    if newGame then
-        OTGData.currentDay = 0
-        OTGData.fuelExpired = false
-        OTGData.fuelExpirationStart = SandboxVars.OffTheGrid.GasolineExpirationDateStart
-        OTGData.fuelExpirationEnd = SandboxVars.OffTheGrid.GasolineExpirationDateEnd
-        OTGData.fuelExpirationRoll = ZombRandFloat(0, 1)
-    end
+    --if newGame then -- NEEDS TO ONLY BE DONE AT THE START OF A SAVE
+        OTGData.expirationDay = SandboxVars.OffTheGrid.GasolineExpirationDateStart + (SandboxVars.OffTheGrid.GasolineExpirationDateEnd-SandboxVars.OffTheGrid.GasolineExpirationDateStart) * ZombRandFloat(0, 1)
+    --end
     ModData.transmit("OffTheGridData")
 end
 
 local function gameStartUtils()
     OTGData = ModData.getOrCreate("OffTheGridData")
-    print("Gasifiers: ",#OTGData.gasifier_list)
-    print("Fuel expires: ", OTGData.fuelExpirationRoll)
-end
-
-local function dailyUpdate()
-    OTGData = ModData.getOrCreate("OffTheGridData")
-    OTGData.currentDay = OTGData.currentDay or 0
-    OTGData.currentDay = OTGData.currentDay + 1
-    if OTGData.currentDay >= OTGData.fuelExpirationStart then
-        if OTGData.fuelExpirationEnd == OTGData.fuelExpirationStart then-- avoid dividing by zero
-            if OTGData.currentDay == OTGData.fuelExpirationEnd then
-                OTGData.fuelExpired = true
-            end
-        elseif (OTGData.currentDay - OTGData.fuelExpirationStart)/(OTGData.fuelExpirationEnd - OTGData.fuelExpirationStart) > OTGData.fuelExpirationRoll then
-            OTGData.fuelExpired = true
-        end
-    end
-    print("Current day: ", OTGData.currentDay)
-    ModData.transmit("OffTheGridData")
+    print("Fuel expires: ", OTGData.expirationDay)
 end
 
 Events.OnInitGlobalModData.Add(initUtils)
 Events.OnGameStart.Add(gameStartUtils)
-
-Events.EveryDays.Add(dailyUpdate)
 
 --local function carsHourUpdate()
 --    --clear wood gas from cars that aren't running

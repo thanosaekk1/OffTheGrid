@@ -6,14 +6,19 @@ local function playerPressedKey(key)
         return false
     end
     local playerCar = getPlayer():getVehicle()
-    local gasThreshold
     if playerCar and playerCar:getSeat(getPlayer()) == 0 and key == 17 then --proceed regardless of amount in the gas tank
-        --print("Trying to start car...", playerCar:getRemainingFuelPercentage())
         local carData = playerCar:getModData()
         if not carData.runningOnWood then --save the max theoretical speed (when starting)
             carData.ratedSpeed = playerCar:getMaxSpeed()
         end
-        sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
+        local fuel_lvl = playerCar:getPartById('GasTank'):getContainerContentAmount()
+        --print(fuel_lvl)
+        -- give the car a small amount so the engine can start and we'll see whether it keeps that
+        --playerCar:getPartById('GasTank'):setContainerContentAmount(1.0)
+        --playerCar:engineDoStarting()
+        if fuel_lvl < 0.01 then
+            sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
+        end
         --CarRunWood(getPlayer():getVehicle())
     end
 end
@@ -32,29 +37,26 @@ local function playerEnteredVehicle(character)
     OTGData = ModData.getOrCreate("OffTheGridData")
     local car = character:getVehicle()
     if not car then return false end
-    if OTGData.fuelExpired and car:getPartById("GasTank"):getContainerContentAmount() > 0.0 and not car:getModData().runningOnWood then
+    if OTGData.expirationDay <= getWorld():getWorldAgeDays() and car:getPartById("GasTank"):getContainerContentAmount() > 0.0 and not car:getModData().runningOnWood then
         character:addLineChatElement("The fuel in this has gone bad...")
         car:getPartById("GasTank"):setContainerContentAmount(0.0)
+        car:transmitPartModData(car:getPartById("GasTank")) --might be necessary for MP
     end
 end
 
 Events.OnEnterVehicle.Add(playerEnteredVehicle)
 
---Events.OnReceiveGlobalModData.Add(function(key, data)
---    if key == "OffTheGridData" then
---        --print("Gasifier list received by client:", #((data and data.gasifier_list) or {}))
---        OTGData = data
---    end
---end)
+-- sound function for clients
+Events.OnServerCommand.Add(function(module, command, args)
+    if module ~= "OffTheGrid" or command ~= "CarBurnSound" then return end
+    local car = getVehicleById(args.vehicleId)
+    if car then
+        car:playSound("CampfireLight")
+    end
+end)
 
 -- FUEL EXPIRATION --
 
---local function ReceiveModData(key, data)
---    if key ~= "OffTheGridData" then return end
---
---end
---
---Events.OnReceiveGlobalModData.Add(ReceiveModData)
 
 -- COMPOSTER --
 
