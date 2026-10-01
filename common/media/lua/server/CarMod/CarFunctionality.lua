@@ -35,14 +35,16 @@ function CarRunWood(car, changeTank)
     --check if the Gasifier isn't clogged with ashes
     local ash_content = gasifier:getNumberOfItem("OffTheGrid.Ash")
     if ash_content > 10 then
-        car:getDriver():addLineChatElement("The gasifier's totally clogged...")
+        --car:getDriver():addLineChatElement("The gasifier's totally clogged...")
+        sendServerCommand("OffTheGrid", "ChatlineClogFull", {playerId = car:getDriver():getOnlineID()})
         return 0
     elseif ash_content > 5 then --close to max amount of ashes, some failures are possible
         local failure_roll = ZombRand(ash_content, 11)
         if failure_roll >= 10 then
             return 0
         end
-        car:getDriver():addLineChatElement("The gasifier's starting to clog...")
+        --car:getDriver():addLineChatElement("The gasifier's starting to clog...")
+        sendServerCommand("OffTheGrid", "ChatlineClogPartial", {playerId = car:getDriver():getOnlineID()})
     end
 
 	-- running out of gas, change to wood
@@ -99,49 +101,6 @@ local function onClientCommand(module, command, player, args)
 end
 
 Events.OnClientCommand.Add(onClientCommand)
-
-local function CarFuelCheck(player)
-    local car = player:getVehicle()
-    if not car or not player:isDriving() then
-        return false
-    else
-        --print("client tank", car:getPartById("GasTank"):getContainerContentAmount())
-        local carData = car:getModData()
-        --if carData.runningOnWood then --save the max theoretical speed and loudness
-        --    carData.ratedSpeed = car:getMaxSpeed() * 2
-        --    --carData.ratedLoudness = car:getEngineLoudness()
-        --else
-        --    carData.ratedSpeed = car:getMaxSpeed()
-        --end
-        
-        -- BUSY WAIT CHECK, CHANGE LATER
-        --if car:isEngineRunning() and car:getPartById('GasTank'):getContainerContentAmount() < 0.01 then
-        --    sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
-        --end
-
-        -- CHECK FOR EXTERNAL REFILL - TEMPORARILY MOVED TO VANILLA OVERRIDE
-        --if car:getPartById("GasTank"):getContainerContentAmount() > carData.fuelFromWood then
-        --    -- external refill happened
-        --    carData.runningOnWood = false
-        --    print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
-        --end
-        
-        --set performance
-        -- RE-ADD LATER
-        --if not carData.ratedSpeed then
-        --    carData.ratedSpeed = car:getMaxSpeed()
-        --end
-        --if carData.runningOnWood then
-        --    car:setMaxSpeed(carData.ratedSpeed * 0.5)
-        --    --carData.fuelFromWood = car:getPartById("GasTank"):getContainerContentAmount()
-        --    --print(car:getModData().runningOnWood, car:getPartById("GasTank"):getContainerContentAmount(), " ", car:getModData().fuelFromWood)
-        --else
-        --    --print("Performance set to original")
-        --    car:setMaxSpeed(carData.ratedSpeed)
-        --end
-        car:transmitModData()
-    end
-end
 
 -- CODE COPIED FROM VANILLA AND EDITED FOR OWN NEEDS
 function Vehicles.Update.GasTank(vehicle, part, elapsedMinutes)
@@ -253,14 +212,15 @@ function GeneratorRunWood(gasifier_pos, generator)
             local gas_level = generator:getFuel()
             generator:setFuel(gas_level + power_generated)
             local wood_to_remove = gasifier:getFirstTypeRecurse(wood_items[i])
-            gasifier:RemoveOneOf(wood_items[i])
+            gasifier:Remove(wood_to_remove)
             local ash_to_add = instanceItem("OffTheGrid.Ash")
             local ash_num = PZMath.roundToInt(power_generated * 5)
 			gasifier:AddItems(ash_to_add, ash_num)
-            gasifier_square:playSoundLocal("FireplaceAddFuel")
+            sendServerCommand("OffTheGrid", "GeneratorBurnSound", {square = gasifier_square})
             local genCondition = generator:getCondition()
             generator:setCondition(genCondition - 2) -- burning wood causes condition to deteriorate faster
             generator:getModData().fuelFromWood = generator:getFuelPercentage()
+            generator:setActivated(true)
             break
         end
     end
@@ -305,7 +265,7 @@ local function GeneratorFuelCheck() -- runs client-side
     end
 end
 
-Events.EveryOneMinute.Add(GeneratorFuelCheck)
+Events.OnTick.Add(GeneratorFuelCheck)
 
 --Events.OnPlayerUpdate.Add(CarFuelCheck)
 
@@ -340,7 +300,9 @@ local function initUtils(newGame)
         OTGData.gasifier_list = {}
     end
     --if newGame then -- NEEDS TO ONLY BE DONE AT THE START OF A SAVE
+    if not OTGData.expirationDay then
         OTGData.expirationDay = SandboxVars.OffTheGrid.GasolineExpirationDateStart + (SandboxVars.OffTheGrid.GasolineExpirationDateEnd-SandboxVars.OffTheGrid.GasolineExpirationDateStart) * ZombRandFloat(0, 1)
+    end
     --end
     ModData.transmit("OffTheGridData")
 end
@@ -370,35 +332,6 @@ Events.OnGameStart.Add(gameStartUtils)
 --end
 
 --Events.EveryHours.Add(carsHourUpdate)
-
-
---local old_activate_generator = ISActivateGenerator.isValid
---local old_take_generator = ISTakeGenerator.isValid
---local old_fix_generator = ISFixGenerator.isValid
---
---function resetExpiredFuel(IsoGen)
---    if fuelExpired then
---        if not IsoGen:getModData().fuelFromWood then
---            IsoGen:getModData().fuelFromWood = 0.0
---        end
---        IsoGen:setFuel(IsoGen:getModData().fuelFromWood)
---    end
---end
---
---function ISActivateGenerator:isValid()
---    resetExpiredFuel(self.generator)
---    return old_activate_generator(self)
---end
---
---function ISTakeGenerator:isValid()
---    resetExpiredFuel(self.generator)
---    return old_take_generator(self)
---end
---
---function ISFixGenerator:isValid()
---    resetExpiredFuel(self.generator)
---    return old_fix_generator(self)
---end
 
 -- OVERRIDE HOOK TO DETECT ENGINE STARTING - DEPRECATED, ONLY SEEMS TO WORK WITH ENGINE BUTTON ON DASHBOARD
 

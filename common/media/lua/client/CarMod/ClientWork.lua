@@ -14,10 +14,6 @@ local function playerPressedKey(key)
         --    carData.ratedSpeed = playerCar:getMaxSpeed()
         --end
         local fuel_lvl = playerCar:getPartById('GasTank'):getContainerContentAmount()
-        --print(fuel_lvl)
-        -- give the car a small amount so the engine can start and we'll see whether it keeps that
-        --playerCar:getPartById('GasTank'):setContainerContentAmount(1.0)
-        --playerCar:engineDoStarting()
         if fuel_lvl < 0.01 then
             sendClientCommand(getPlayer(), "OffTheGrid", "CarRunWood", {})
         end
@@ -58,10 +54,27 @@ Events.OnEnterVehicle.Add(playerEnteredVehicle)
 
 -- sound function for clients
 Events.OnServerCommand.Add(function(module, command, args)
-    if module ~= "OffTheGrid" or command ~= "CarBurnSound" then return end
-    local car = getVehicleById(args.vehicleId)
-    if car then
-        car:playSound("CampfireLight")
+    if module ~= "OffTheGrid" then return end
+    if command == "CarBurnSound" then
+        local car = getVehicleById(args.vehicleId)
+        if car then
+            car:playSound("CampfireLight")
+        end
+    elseif command == "GeneratorBurnSound" then
+        local square = args.square
+        if square then
+            square:playSound("CampfireLight")
+        end
+    elseif command == "ChatlineClogFull" then
+        local player = getPlayerByOnlineID(args.playerId)
+        if player then
+            player:addLineChatElement("The gasifier's totally clogged...")
+        end
+    elseif command == "ChatlineClogPartial" then
+        local player = getPlayerByOnlineID(args.playerId)
+        if player then
+            player:addLineChatElement("The gasifier's starting to clog...")
+        end
     end
 end)
 
